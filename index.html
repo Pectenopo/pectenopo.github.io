@@ -1,1 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>THE MATRIX // TERMINAL</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --hud-color: #00ff00; 
+            --bg-color: #050505;
+        }
 
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Courier New', Courier, monospace; }
+        
+        body {
+            background-color: var(--bg-color);
+            color: var(--hud-color);
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; opacity: 0.4; }
+
+        .hud-container {
+            position: relative; z-index: 10; width: 90%; max-width: 1200px; height: 85vh;
+            border: 2px solid var(--hud-color); box-shadow: 0 0 15px var(--hud-color), inset 0 0 15px var(--hud-color);
+            background: rgba(0, 0, 0, 0.8); border-radius: 10px; display: flex; flex-direction: column; padding: 20px;
+        }
+
+        .cyber-btn {
+            background: transparent; color: var(--hud-color); border: 1px solid var(--hud-color);
+            padding: 10px 20px; text-transform: uppercase; cursor: pointer; transition: all 0.2s;
+            box-shadow: 0 0 5px var(--hud-color); margin-right: 10px;
+        }
+
+        .cyber-btn:hover { background: var(--hud-color); color: var(--bg-color); box-shadow: 0 0 20px var(--hud-color); }
+
+        input {
+            background: transparent; border: none; border-bottom: 2px solid var(--hud-color);
+            color: var(--hud-color); padding: 5px; outline: none; margin-bottom: 15px; width: 200px; display: block;
+        }
+
+        .hidden { display: none !important; }
+        .nav-bar { display: flex; margin-bottom: 20px; border-bottom: 1px solid var(--hud-color); padding-bottom: 10px;}
+        
+        #video-container { display: flex; gap: 10px; margin-top: 20px; }
+        video { width: 300px; border: 1px solid var(--hud-color); transform: scaleX(-1); }
+    </style>
+</head>
+<body>
+
+    <canvas id="matrix-canvas"></canvas>
+
+    <div class="hud-container">
+        <div id="auth-view">
+            <h2>> SYSTEM_LOGIN</h2><br>
+            <input type="text" id="username" placeholder="USERNAME">
+            <input type="password" id="password" placeholder="PASSWORD">
+            <div style="display:flex;">
+                <button class="cyber-btn" onclick="login()">Authenticate</button>
+                <button class="cyber-btn" onclick="register()">Register</button>
+            </div>
+            <p id="auth-msg" style="margin-top: 15px;"></p>
+        </div>
+
+        <div id="hub-view" class="hidden">
+            <div class="nav-bar">
+                <button class="cyber-btn" onclick="showTab('locate')">Locate</button>
+                <button class="cyber-btn" onclick="showTab('radio')">Radio Freq</button>
+                <button class="cyber-btn" onclick="showTab('settings')">Settings</button>
+                <button class="cyber-btn" onclick="logout()" style="border-color: red; color: red;">Disconnect</button>
+            </div>
+
+            <div id="radio-tab">
+                <h3>> FREQUENCY_COMMUNICATOR</h3>
+                <p>Enter a frequency (e.g., 104.5) to connect via WebRTC.</p><br>
+                <input type="text" id="freq-input" placeholder="000.000">
+                <button class="cyber-btn" onclick="joinFrequency()">Tune In</button>
+                <button class="cyber-btn" id="mic-btn" onclick="toggleMic()">Mute Mic</button>
+                
+                <div id="video-container">
+                    <video id="local-video" autoplay muted playsinline></video>
+                    <video id="remote-video" autoplay playsinline></video>
+                </div>
+                <p id="rtc-status" style="margin-top: 10px; color: yellow;">Status: Disconnected</p>
+            </div>
+
+            <div id="settings-tab" class="hidden">
+                <h3>> SYSTEM_SETTINGS</h3><br>
+                <p>Change HUD Color (Hex):</p>
+                <input type="text" id="color-input" placeholder="#00ff00">
+                <button class="cyber-btn" onclick="updateColor()">Apply Color</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- 1. Matrix Background Logic ---
+        const canvas = document.getElementById('matrix-canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+        const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+        const fontSize = 16; const columns = canvas.width / fontSize;
+        const drops = Array(Math.floor(columns)).fill(1);
+
+        setInterval(() => {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--hud-color').trim();
+            ctx.font = fontSize + 'px monospace';
+            for (let i = 0; i < drops.length; i++) {
+                ctx.fillText(chars[Math.floor(Math.random() * chars.length)], i * fontSize, drops[i] * fontSize);
+                if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) drops[i] = 0;
+                drops[i]++;
+            }
+        }, 33);
+
+        // --- 2. Supabase Init ---
+        const SUPABASE_URL = 'https://afddovxxhrpabdcbFmkd.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFmZGRvdnh4aHJwYWJkY2JmbWtkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mzk5NzMsImV4cCI6MjA4OTExNTk3M30.BfViZBwr95NBwq4kx8Sco617bwE8zCnc89Qk-naNdSk';
+        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        let currentUser = null;
+
+        // --- 3. Auth Logic ---
+        async function register() {
+            const user = document.getElementById('username').value;
+            const pass = document.getElementById('password').value;
+            const { data, error } = await supabase.auth.signUp({
+                email: `${user}@matrix.local`, password: pass, options: { data: { username: user } }
+            });
+            document.getElementById('auth-msg').innerText = error ? `ERROR: ${error.message}` : "REGISTERED. YOU MAY NOW AUTHENTICATE.";
+        }
+
+        async function login() {
+            const user = document.getElementById('username').value;
+            const pass = document.getElementById('password').value;
+            const { data, error } = await supabase.auth.signInWithPassword({
+                email: `${user}@matrix.local`, password: pass
+            });
+            if (error) {
+                document.getElementById('auth-msg').innerText = `ERROR: ${error.message}`;
+            } else {
+                currentUser = data.user;
+                document.getElementById('auth-view').classList.add('hidden');
+                document.getElementById('hub-view').classList.remove('hidden');
+            }
+        }
+
+        async function logout() {
+            await supabase.auth.signOut();
+            location.reload();
+        }
+
+        // --- 4. UI Logic ---
+        function showTab(tabId) {
+            document.getElementById('radio-tab').classList.add('hidden');
+            document.getElementById('settings-tab').classList.add('hidden');
+            document.getElementById(`${tabId}-tab`).classList.remove('hidden');
+        }
+
+        function updateColor() {
+            const newColor = document.getElementById('color-input').value;
+            document.documentElement.style.setProperty('--hud-color', newColor);
+        }
+
+        // --- 5. WEBRTC & RADIO LOGIC (The Hard Part) ---
+        let localStream;
+        let peerConnection;
+        let signalingChannel;
+        const servers = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+
+        async function joinFrequency() {
+            const freq = document.getElementById('freq-input').value;
+            if(!freq) return alert("Enter a frequency.");
+            
+            document.getElementById('rtc-status').innerText = `Status: Tuning to ${freq}...`;
+
+            // 1. Get Camera/Mic
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                document.getElementById('local-video').srcObject = localStream;
+            } catch (err) {
+                return alert("Camera/Mic access denied. You must run this on localhost or HTTPS.");
+            }
+
+            // 2. Setup Supabase Realtime Channel for Signaling
+            if(signalingChannel) await supabase.removeChannel(signalingChannel);
+            signalingChannel = supabase.channel(`radio-${freq}`, { config: { broadcast: { ack: false } } });
+
+            // Listen for incoming WebRTC signals
+            signalingChannel.on('broadcast', { event: 'rtc-signal' }, async (payload) => {
+                const message = payload.payload;
+                if (message.sender === currentUser.id) return; // Ignore our own signals
+
+                if (!peerConnection) createPeerConnection();
+
+                if (message.type === 'offer') {
+                    await peerConnection.setRemoteDescription(new RTCSessionDescription(message.offer));
+                    const answer = await peerConnection.createAnswer();
+                    await peerConnection.setLocalDescription(answer);
+                    signalingChannel.send({ type: 'broadcast', event: 'rtc-signal', payload: { type: 'answer', answer: answer, sender: currentUser.id } });
+                } else if (message.type === 'answer') {
+                    await peerConnection.setRemoteDescription(new RTCSessionDescription(message.answer));
+                } else if (message.type === 'ice-candidate') {
+                    await peerConnection.addIceCandidate(new RTCIceCandidate(message.candidate));
+                }
+            });
+
+            // Join channel and create an offer to anyone listening
+            signalingChannel.subscribe(async (status) => {
+                if (status === 'SUBSCRIBED') {
+                    createPeerConnection();
+                    const offer = await peerConnection.createOffer();
+                    await peerConnection.setLocalDescription(offer);
+                    signalingChannel.send({ type: 'broadcast', event: 'rtc-signal', payload: { type: 'offer', offer: offer, sender: currentUser.id } });
+                    document.getElementById('rtc-status').innerText = `Status: Broadcasting on ${freq}...`;
+                }
+            });
+        }
+
+        function createPeerConnection() {
+            peerConnection = new RTCPeerConnection(servers);
+            
+            // Add local tracks to connection
+            localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+
+            // Listen for remote tracks
+            peerConnection.ontrack = (event) => {
+                document.getElementById('remote-video').srcObject = event.streams[0];
+                document.getElementById('rtc-status').innerText = `Status: Connected to Peer!`;
+            };
+
+            // Send ICE candidates to peer
+            peerConnection.onicecandidate = (event) => {
+                if (event.candidate) {
+                    signalingChannel.send({ type: 'broadcast', event: 'rtc-signal', payload: { type: 'ice-candidate', candidate: event.candidate, sender: currentUser.id } });
+                }
+            };
+        }
+
+        function toggleMic() {
+            const audioTrack = localStream.getAudioTracks()[0];
+            audioTrack.enabled = !audioTrack.enabled;
+            document.getElementById('mic-btn').innerText = audioTrack.enabled ? "Mute Mic" : "Unmute Mic";
+            document.getElementById('mic-btn').style.color = audioTrack.enabled ? "var(--hud-color)" : "red";
+        }
+    </script>
+</body>
+</html>
