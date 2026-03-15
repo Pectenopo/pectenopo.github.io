@@ -9,24 +9,41 @@
         :root { --hud-color: #00ff00; --bg-color: #050505; }
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Courier New', Courier, monospace; }
         body { background-color: var(--bg-color); color: var(--hud-color); overflow: hidden; display: flex; justify-content: center; align-items: center; height: 100vh; }
-        canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; opacity: 0.4; pointer-events: none;}
+        canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none;}
         
-        .hud-container { position: relative; z-index: 10; width: 95%; max-width: 1300px; height: 90vh; border: 2px solid var(--hud-color); box-shadow: 0 0 15px var(--hud-color), inset 0 0 15px var(--hud-color); background: rgba(0, 0, 0, 0.85); border-radius: 10px; display: flex; flex-direction: column; padding: 20px; }
-        .cyber-btn { background: transparent; color: var(--hud-color); border: 1px solid var(--hud-color); padding: 8px 15px; text-transform: uppercase; cursor: pointer; transition: all 0.2s; margin-right: 5px; margin-bottom: 5px; font-weight: bold;}
-        .cyber-btn:hover { background: var(--hud-color); color: var(--bg-color); box-shadow: 0 0 15px var(--hud-color); }
+        .hud-container { position: relative; z-index: 10; width: 95%; max-width: 1300px; height: 95vh; border: 2px solid var(--hud-color); box-shadow: 0 0 15px var(--hud-color), inset 0 0 15px var(--hud-color); background: rgba(0, 0, 0, 0.85); border-radius: 10px; display: flex; flex-direction: column; padding: 20px; overflow-y: auto;}
+        .cyber-btn { background: transparent; color: var(--hud-color); border: 1px solid var(--hud-color); padding: 10px 15px; text-transform: uppercase; cursor: pointer; transition: all 0.2s; margin-right: 5px; margin-bottom: 5px; font-weight: bold;}
+        .cyber-btn:hover, .cyber-btn:active { background: var(--hud-color); color: var(--bg-color); box-shadow: 0 0 15px var(--hud-color); }
         .cyber-btn.danger { border-color: red; color: red; }
-        .cyber-btn.danger:hover { background: red; color: white; box-shadow: 0 0 15px red; }
+        .cyber-btn.danger:hover, .cyber-btn.danger:active { background: red; color: white; box-shadow: 0 0 15px red; }
         
-        input { background: rgba(0,255,0,0.1); border: 1px solid var(--hud-color); color: var(--hud-color); padding: 8px; outline: none; margin-bottom: 10px; width: 250px; display: block; }
+        input { background: rgba(0,255,0,0.1); border: 1px solid var(--hud-color); color: var(--hud-color); padding: 10px; outline: none; margin-bottom: 10px; width: 100%; max-width: 300px; display: block; }
         .hidden { display: none !important; }
         .nav-bar { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 20px; border-bottom: 1px solid var(--hud-color); padding-bottom: 15px;}
         
-        .panel { border: 1px solid var(--hud-color); padding: 15px; margin-top: 10px; height: 60vh; overflow-y: auto; }
-        .user-card { border: 1px dashed var(--hud-color); padding: 10px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;}
+        .panel { border: 1px solid var(--hud-color); padding: 15px; margin-top: 10px; height: 50vh; overflow-y: auto; }
+        .user-card { border: 1px dashed var(--hud-color); padding: 10px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;}
         
-        #chat-box { height: 300px; border: 1px solid var(--hud-color); padding: 10px; overflow-y: scroll; margin-bottom: 10px; display: flex; flex-direction: column; gap: 5px;}
-        .msg { padding: 5px; background: rgba(0,255,0,0.1); width: fit-content; border-radius: 4px; }
+        /* Mobile Responsive Comms Layout */
+        .comms-container { display: flex; gap: 10px; height: 100%; flex-direction: row; }
+        #friends-list { flex: 1; border: 1px solid var(--hud-color); padding: 10px; overflow-y: auto; min-width: 150px;}
+        .chat-area { flex: 2; display: flex; flex-direction: column;}
+        
+        #chat-box { flex-grow: 1; border: 1px solid var(--hud-color); padding: 10px; overflow-y: scroll; margin-bottom: 10px; display: flex; flex-direction: column; gap: 5px; height: 300px;}
+        .msg { padding: 8px; background: rgba(0,255,0,0.1); width: fit-content; max-width: 80%; border-radius: 4px; word-wrap: break-word;}
         .msg.me { align-self: flex-end; background: rgba(0,255,0,0.3); }
+
+        /* Mobile specific adjustments */
+        @media (max-width: 768px) {
+            .comms-container { flex-direction: column; }
+            #friends-list { min-height: 150px; flex: none; height: 30%; }
+            .chat-area { height: 70%; }
+            .cyber-btn { padding: 12px; font-size: 0.9em; width: 100%; margin-right: 0;}
+            .nav-bar { flex-direction: column; }
+        }
+
+        /* Giant Touch PTT Button */
+        #touch-ptt-btn { width: 100%; padding: 25px; margin-top: 15px; font-size: 1.2em; border: 2px dashed var(--hud-color); user-select: none; -webkit-user-select: none; }
     </style>
 </head>
 <body>
@@ -37,9 +54,9 @@
         
         <div id="auth-view">
             <h2>> SYSTEM_LOGIN</h2><br>
-            <input type="text" id="username" placeholder="USERNAME" autocomplete="off">
+            <input type="text" id="username" placeholder="USERNAME" autocomplete="off" autocorrect="off" autocapitalize="off">
             <input type="password" id="password" placeholder="PASSWORD">
-            <div style="display:flex;">
+            <div style="display:flex; flex-wrap: wrap; gap: 5px;">
                 <button class="cyber-btn" onclick="login()">Authenticate</button>
                 <button class="cyber-btn" onclick="register()">Register</button>
             </div>
@@ -57,23 +74,23 @@
 
             <div id="locate-tab" class="hidden">
                 <h3>> USER_DATABASE_SEARCH</h3>
-                <input type="text" id="search-input" placeholder="Search by exact username...">
+                <input type="text" id="search-input" placeholder="Search username...">
                 <button class="cyber-btn" onclick="searchUsers()">Search</button>
                 <div class="panel" id="search-results"></div>
             </div>
 
             <div id="comms-tab" class="hidden">
                 <h3>> SECURE_COMMUNICATIONS</h3>
-                <div style="display: flex; gap: 20px; height: 100%;">
-                    <div style="flex: 1; border: 1px solid var(--hud-color); padding: 10px;" id="friends-list">
+                <div class="comms-container">
+                    <div id="friends-list">
                         <h4>Friends List</h4><hr style="border-color:var(--hud-color); margin: 5px 0;">
                         </div>
-                    <div style="flex: 2;">
+                    <div class="chat-area">
                         <h4 id="chat-target">Select a friend to chat</h4>
                         <div id="chat-box"></div>
                         <div style="display:flex; gap: 5px;">
                             <input type="text" id="msg-input" placeholder="Type message..." style="width:100%; margin:0;">
-                            <button class="cyber-btn" onclick="sendMessage()">Send</button>
+                            <button class="cyber-btn" style="width: auto;" onclick="sendMessage()">Send</button>
                         </div>
                     </div>
                 </div>
@@ -81,17 +98,21 @@
 
             <div id="radio-tab">
                 <h3>> ANONYMOUS_FREQUENCY_RADIO</h3>
-                <p>Voice only. No cameras. No identities. Push [SPACEBAR] to talk.</p><br>
-                <div style="display: flex; gap: 10px; align-items: center;">
-                    <input type="text" id="freq-input" placeholder="Frequency (e.g. 104.5)" style="margin:0;">
-                    <button class="cyber-btn" onclick="joinFrequency()">Tune In</button>
-                    <button class="cyber-btn danger hidden" id="leave-radio-btn" onclick="leaveFrequency()">Power Off Radio</button>
+                <p>Voice only. Push [SPACEBAR] or hold button below.</p><br>
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    <input type="text" id="freq-input" placeholder="Freq (e.g. 104.5)" style="margin:0;">
+                    <div style="display: flex; gap: 5px;">
+                        <button class="cyber-btn" onclick="joinFrequency()">Tune In</button>
+                        <button class="cyber-btn danger hidden" id="leave-radio-btn" onclick="leaveFrequency()">Power Off</button>
+                    </div>
                 </div>
                 
                 <p id="rtc-status" style="margin-top: 15px; color: yellow;">Status: Radio Offline</p>
                 <div id="ptt-indicator" style="margin-top: 10px; color: #555; font-weight: bold;">[MIC MUTED]</div>
                 
-                <audio id="remote-audio" autoplay></audio>
+                <button id="touch-ptt-btn" class="cyber-btn hidden">[ HOLD TO TRANSMIT ]</button>
+
+                <audio id="remote-audio" autoplay playsinline></audio>
             </div>
 
             <div id="settings-tab" class="hidden">
@@ -123,6 +144,11 @@
                 drops[i]++;
             }
         }, 33);
+
+        window.addEventListener('resize', () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        });
 
         // --- 2. Supabase Init ---
         const SUPABASE_URL = 'https://afddovxxhrpabdcbFmkd.supabase.co';
@@ -197,11 +223,11 @@
             if(data.length === 0) return res.innerHTML = "No users found.";
             
             data.forEach(u => {
-                if(u.username === currentUser.username) return; // Don't show self
+                if(u.username === currentUser.username) return; 
                 res.innerHTML += `
                     <div class="user-card">
                         <span>[${u.role.toUpperCase()}] ${u.username}</span>
-                        <button class="cyber-btn" onclick="sendFriendReq('${u.username}')">Add Friend</button>
+                        <button class="cyber-btn" onclick="sendFriendReq('${u.username}')" style="width: auto;">Add Friend</button>
                     </div>
                 `;
             });
@@ -224,7 +250,7 @@
             if(data) {
                 data.forEach(f => {
                     const friendName = f.requester === currentUser.username ? f.addressee : f.requester;
-                    list.innerHTML += `<button class="cyber-btn" style="width:100%; text-align:left; border:none;" onclick="openChat('${friendName}')">> ${friendName}</button>`;
+                    list.innerHTML += `<button class="cyber-btn" style="width:100%; text-align:left; border:none; margin-bottom: 2px;" onclick="openChat('${friendName}')">> ${friendName}</button>`;
                 });
             }
         }
@@ -237,7 +263,6 @@
             activeChat = friendName;
             document.getElementById('chat-target').innerText = `Chatting with: ${friendName}`;
             
-            // Load history
             const { data } = await supabaseClient.from('messages')
                 .select('*')
                 .or(`and(sender.eq.${currentUser.username},receiver.eq.${friendName}),and(sender.eq.${friendName},receiver.eq.${currentUser.username})`)
@@ -247,7 +272,6 @@
             box.innerHTML = '';
             if(data) data.forEach(m => renderMessage(m));
 
-            // Subscribe to new messages
             if(chatSub) supabaseClient.removeChannel(chatSub);
             chatSub = supabaseClient.channel('custom-msg-channel')
                 .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => {
@@ -262,7 +286,10 @@
         function renderMessage(m) {
             const box = document.getElementById('chat-box');
             const isMe = m.sender === currentUser.username;
-            box.innerHTML += `<div class="msg ${isMe ? 'me' : ''}"><b>${isMe ? 'You' : m.sender}:</b> ${m.content}</div>`;
+            const div = document.createElement('div');
+            div.className = `msg ${isMe ? 'me' : ''}`;
+            div.innerHTML = `<b>${isMe ? 'You' : m.sender}:</b> ${m.content}`;
+            box.appendChild(div);
             box.scrollTop = box.scrollHeight;
         }
 
@@ -287,15 +314,15 @@
             document.getElementById('rtc-status').innerText = `Status: Scanning frequency ${freq}...`;
 
             try {
-                // AUDIO ONLY. No video.
+                // Request Audio
                 localAudioStream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
-                
-                // Start Muted for Push-to-Talk
-                localAudioStream.getAudioTracks()[0].enabled = false; 
+                localAudioStream.getAudioTracks()[0].enabled = false; // Start muted
 
                 document.getElementById('leave-radio-btn').classList.remove('hidden');
+                document.getElementById('touch-ptt-btn').classList.remove('hidden');
             } catch (err) {
-                return alert("Microphone access denied.");
+                console.error(err);
+                return alert("Mic blocked! You MUST use HTTPS on mobile to access the microphone.");
             }
 
             if(signalingChannel) await supabaseClient.removeChannel(signalingChannel);
@@ -303,7 +330,6 @@
 
             signalingChannel.on('broadcast', { event: 'rtc-signal' }, async (payload) => {
                 const message = payload.payload;
-                // Anonymous payload - no username checked, just socket ids or purely blind
                 
                 if (!peerConnection) createPeerConnection(freq);
 
@@ -335,7 +361,6 @@
             localAudioStream.getTracks().forEach(track => peerConnection.addTrack(track, localAudioStream));
 
             peerConnection.ontrack = (event) => {
-                // Play remote audio into the hidden audio tag
                 document.getElementById('remote-audio').srcObject = event.streams[0];
                 document.getElementById('rtc-status').innerText = `Status: Connected to unknown peer on ${freq} MHz`;
             };
@@ -348,39 +373,57 @@
         }
 
         async function leaveFrequency() {
-            if(signalingChannel) {
-                await supabaseClient.removeChannel(signalingChannel);
-                signalingChannel = null;
-            }
-            if(peerConnection) {
-                peerConnection.close();
-                peerConnection = null;
-            }
-            if(localAudioStream) {
-                localAudioStream.getTracks().forEach(track => track.stop());
-                localAudioStream = null;
-            }
+            if(signalingChannel) { await supabaseClient.removeChannel(signalingChannel); signalingChannel = null; }
+            if(peerConnection) { peerConnection.close(); peerConnection = null; }
+            if(localAudioStream) { localAudioStream.getTracks().forEach(track => track.stop()); localAudioStream = null; }
+            
             document.getElementById('rtc-status').innerText = "Status: Radio Offline.";
             document.getElementById('leave-radio-btn').classList.add('hidden');
+            document.getElementById('touch-ptt-btn').classList.add('hidden');
+            document.getElementById('ptt-indicator').innerText = "[MIC MUTED]";
+            document.getElementById('ptt-indicator').style.color = "#555";
         }
 
-        // PUSH TO TALK LOGIC (Spacebar)
-        document.addEventListener('keydown', (e) => {
-            if (e.code === 'Space' && localAudioStream && !document.getElementById('radio-tab').classList.contains('hidden') && e.target.tagName !== 'INPUT') {
-                e.preventDefault(); // Stop page scrolling
+        // --- PUSH TO TALK LOGIC (Spacebar AND Touch/Click) ---
+        function unmuteMic() {
+            if (localAudioStream) {
                 localAudioStream.getAudioTracks()[0].enabled = true;
                 document.getElementById('ptt-indicator').innerText = "[TRANSMITTING]";
                 document.getElementById('ptt-indicator').style.color = "var(--hud-color)";
+                document.getElementById('touch-ptt-btn').style.background = "var(--hud-color)";
+                document.getElementById('touch-ptt-btn').style.color = "var(--bg-color)";
             }
-        });
+        }
 
-        document.addEventListener('keyup', (e) => {
-            if (e.code === 'Space' && localAudioStream) {
+        function muteMic() {
+            if (localAudioStream) {
                 localAudioStream.getAudioTracks()[0].enabled = false;
                 document.getElementById('ptt-indicator').innerText = "[MIC MUTED]";
                 document.getElementById('ptt-indicator').style.color = "#555";
+                document.getElementById('touch-ptt-btn').style.background = "transparent";
+                document.getElementById('touch-ptt-btn').style.color = "var(--hud-color)";
+            }
+        }
+
+        // Keyboard Spacebar
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' && localAudioStream && !document.getElementById('radio-tab').classList.contains('hidden') && e.target.tagName !== 'INPUT') {
+                e.preventDefault(); unmuteMic();
             }
         });
+        document.addEventListener('keyup', (e) => {
+            if (e.code === 'Space' && localAudioStream) { muteMic(); }
+        });
+
+        // Touch / Mouse Button
+        const pttBtn = document.getElementById('touch-ptt-btn');
+        pttBtn.addEventListener('mousedown', unmuteMic);
+        pttBtn.addEventListener('mouseup', muteMic);
+        pttBtn.addEventListener('mouseleave', muteMic); // If they drag cursor off button
+        pttBtn.addEventListener('touchstart', (e) => { e.preventDefault(); unmuteMic(); });
+        pttBtn.addEventListener('touchend', (e) => { e.preventDefault(); muteMic(); });
+        pttBtn.addEventListener('touchcancel', (e) => { e.preventDefault(); muteMic(); });
+
     </script>
 </body>
 </html>
