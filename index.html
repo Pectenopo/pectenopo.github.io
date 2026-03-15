@@ -43,7 +43,7 @@
         }
 
         /* Giant Touch PTT Button */
-        #touch-ptt-btn { width: 100%; padding: 25px; margin-top: 15px; font-size: 1.2em; border: 2px dashed var(--hud-color); user-select: none; -webkit-user-select: none; }
+        #touch-ptt-btn { width: 100%; padding: 25px; margin-top: 15px; font-size: 1.2em; border: 2px dashed var(--hud-color); user-select: none; -webkit-user-select: none; touch-action: manipulation; }
     </style>
 </head>
 <body>
@@ -146,8 +146,7 @@
         }, 33);
 
         window.addEventListener('resize', () => {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
+            canvas.width = window.innerWidth; canvas.height = window.innerHeight;
         });
 
         // --- 2. Supabase Init ---
@@ -166,7 +165,7 @@
             if (user === 'Edeer') userRole = 'Grandmaster';
             if (user === 'User1234') userRole = 'Leader';
 
-            const { data, error } = await supabaseClient.from('custom_users').insert([{ username: user, password: pass, role: userRole }]);
+            const { error } = await supabaseClient.from('custom_users').insert([{ username: user, password: pass, role: userRole }]);
             
             if (error) {
                 if (error.code === '23505') document.getElementById('auth-msg').innerText = "ERROR: Username taken.";
@@ -217,7 +216,7 @@
             const res = document.getElementById('search-results');
             res.innerHTML = "Searching DB...";
             
-            const { data, error } = await supabaseClient.from('custom_users').select('username, role').ilike('username', `%${query}%`);
+            const { data } = await supabaseClient.from('custom_users').select('username, role').ilike('username', `%${query}%`);
             res.innerHTML = '';
             
             if(data.length === 0) return res.innerHTML = "No users found.";
@@ -240,7 +239,7 @@
         }
 
         async function loadFriends() {
-            const { data, error } = await supabaseClient.from('friends')
+            const { data } = await supabaseClient.from('friends')
                 .select('*')
                 .or(`requester.eq.${currentUser.username},addressee.eq.${currentUser.username}`);
             
@@ -301,7 +300,7 @@
             await supabaseClient.from('messages').insert([{ sender: currentUser.username, receiver: activeChat, content: msg }]);
         }
 
-        // --- 7. ANONYMOUS BLIND RADIO & PTT ---
+        // --- 7. DEBUGGED RADIO LOGIC ---
         let localAudioStream = null;
         let peerConnection = null;
         let signalingChannel = null;
@@ -311,18 +310,30 @@
             const freq = document.getElementById('freq-input').value;
             if(!freq) return alert("Enter a frequency.");
             
-            document.getElementById('rtc-status').innerText = `Status: Scanning frequency ${freq}...`;
+            // APPLE REQUIREMENT: Force audio element to initialize on user interaction
+            const audioEl = document.getElementById('remote-audio');
+            audioEl.play().catch(e => console.log("Audio play deferred until track arrives."));
+
+            document.getElementById('rtc-status').innerText = `Status: Requesting mic access...`;
 
             try {
-                // Request Audio
+                // DEBUG 1: Check if API exists at all
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    alert("DEBUG 1: navigator.mediaDevices is undefined. The browser has completely removed mic access. You are NOT on a secure connection (HTTPS or localhost). Disabling site protection will not fix this; Apple/Google hardcode this requirement.");
+                    return;
+                }
+
                 localAudioStream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
                 localAudioStream.getAudioTracks()[0].enabled = false; // Start muted
 
                 document.getElementById('leave-radio-btn').classList.remove('hidden');
                 document.getElementById('touch-ptt-btn').classList.remove('hidden');
+                document.getElementById('rtc-status').innerText = `Status: Mic acquired. Tuning to ${freq}...`;
+
             } catch (err) {
-                console.error(err);
-                return alert("Mic blocked! You MUST use HTTPS on mobile to access the microphone.");
+                // DEBUG 2: Catch specific errors
+                alert(`DEBUG 2 (Mic Error): ${err.name} - ${err.message}. If this says NotAllowedError, you clicked deny or OS permissions are blocking the browser.`);
+                return;
             }
 
             if(signalingChannel) await supabaseClient.removeChannel(signalingChannel);
@@ -330,7 +341,6 @@
 
             signalingChannel.on('broadcast', { event: 'rtc-signal' }, async (payload) => {
                 const message = payload.payload;
-                
                 if (!peerConnection) createPeerConnection(freq);
 
                 if (message.type === 'offer') {
@@ -351,7 +361,7 @@
                     const offer = await peerConnection.createOffer();
                     await peerConnection.setLocalDescription(offer);
                     signalingChannel.send({ type: 'broadcast', event: 'rtc-signal', payload: { type: 'offer', offer: offer } });
-                    document.getElementById('rtc-status').innerText = `Status: Tuned to ${freq} MHz.`;
+                    document.getElementById('rtc-status').innerText = `Status: Tuned to ${freq} MHz. Ready for connection.`;
                 }
             });
         }
@@ -361,8 +371,10 @@
             localAudioStream.getTracks().forEach(track => peerConnection.addTrack(track, localAudioStream));
 
             peerConnection.ontrack = (event) => {
-                document.getElementById('remote-audio').srcObject = event.streams[0];
-                document.getElementById('rtc-status').innerText = `Status: Connected to unknown peer on ${freq} MHz`;
+                const audioEl = document.getElementById('remote-audio');
+                audioEl.srcObject = event.streams[0];
+                audioEl.play().catch(err => alert("DEBUG 3 (Audio Play Error): Mobile browser blocked incoming audio. Click anywhere on the screen."));
+                document.getElementById('rtc-status').innerText = `Status: Connected to unknown peer!`;
             };
 
             peerConnection.onicecandidate = (event) => {
@@ -384,7 +396,7 @@
             document.getElementById('ptt-indicator').style.color = "#555";
         }
 
-        // --- PUSH TO TALK LOGIC (Spacebar AND Touch/Click) ---
+        // --- PUSH TO TALK LOGIC ---
         function unmuteMic() {
             if (localAudioStream) {
                 localAudioStream.getAudioTracks()[0].enabled = true;
@@ -419,7 +431,7 @@
         const pttBtn = document.getElementById('touch-ptt-btn');
         pttBtn.addEventListener('mousedown', unmuteMic);
         pttBtn.addEventListener('mouseup', muteMic);
-        pttBtn.addEventListener('mouseleave', muteMic); // If they drag cursor off button
+        pttBtn.addEventListener('mouseleave', muteMic); 
         pttBtn.addEventListener('touchstart', (e) => { e.preventDefault(); unmuteMic(); });
         pttBtn.addEventListener('touchend', (e) => { e.preventDefault(); muteMic(); });
         pttBtn.addEventListener('touchcancel', (e) => { e.preventDefault(); muteMic(); });
