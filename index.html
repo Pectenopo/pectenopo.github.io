@@ -6,49 +6,27 @@
     <title>THE MATRIX // TERMINAL</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
-        :root {
-            --hud-color: #00ff00; 
-            --bg-color: #050505;
-        }
-
+        :root { --hud-color: #00ff00; --bg-color: #050505; }
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Courier New', Courier, monospace; }
+        body { background-color: var(--bg-color); color: var(--hud-color); overflow: hidden; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; opacity: 0.4; pointer-events: none;}
         
-        body {
-            background-color: var(--bg-color);
-            color: var(--hud-color);
-            overflow: hidden;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-        }
-
-        canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; opacity: 0.4; }
-
-        .hud-container {
-            position: relative; z-index: 10; width: 90%; max-width: 1200px; height: 85vh;
-            border: 2px solid var(--hud-color); box-shadow: 0 0 15px var(--hud-color), inset 0 0 15px var(--hud-color);
-            background: rgba(0, 0, 0, 0.8); border-radius: 10px; display: flex; flex-direction: column; padding: 20px;
-        }
-
-        .cyber-btn {
-            background: transparent; color: var(--hud-color); border: 1px solid var(--hud-color);
-            padding: 10px 20px; text-transform: uppercase; cursor: pointer; transition: all 0.2s;
-            box-shadow: 0 0 5px var(--hud-color); margin-right: 10px; margin-bottom: 10px;
-        }
-
-        .cyber-btn:hover { background: var(--hud-color); color: var(--bg-color); box-shadow: 0 0 20px var(--hud-color); }
-
-        input {
-            background: transparent; border: none; border-bottom: 2px solid var(--hud-color);
-            color: var(--hud-color); padding: 5px; outline: none; margin-bottom: 15px; width: 200px; display: block;
-        }
-
+        .hud-container { position: relative; z-index: 10; width: 95%; max-width: 1300px; height: 90vh; border: 2px solid var(--hud-color); box-shadow: 0 0 15px var(--hud-color), inset 0 0 15px var(--hud-color); background: rgba(0, 0, 0, 0.85); border-radius: 10px; display: flex; flex-direction: column; padding: 20px; }
+        .cyber-btn { background: transparent; color: var(--hud-color); border: 1px solid var(--hud-color); padding: 8px 15px; text-transform: uppercase; cursor: pointer; transition: all 0.2s; margin-right: 5px; margin-bottom: 5px; font-weight: bold;}
+        .cyber-btn:hover { background: var(--hud-color); color: var(--bg-color); box-shadow: 0 0 15px var(--hud-color); }
+        .cyber-btn.danger { border-color: red; color: red; }
+        .cyber-btn.danger:hover { background: red; color: white; box-shadow: 0 0 15px red; }
+        
+        input { background: rgba(0,255,0,0.1); border: 1px solid var(--hud-color); color: var(--hud-color); padding: 8px; outline: none; margin-bottom: 10px; width: 250px; display: block; }
         .hidden { display: none !important; }
-        .nav-bar { display: flex; margin-bottom: 20px; border-bottom: 1px solid var(--hud-color); padding-bottom: 10px;}
+        .nav-bar { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 20px; border-bottom: 1px solid var(--hud-color); padding-bottom: 15px;}
         
-        #video-container { display: flex; gap: 10px; margin-top: 20px; }
-        video { width: 300px; border: 1px solid var(--hud-color); transform: scaleX(-1); background: #111; }
+        .panel { border: 1px solid var(--hud-color); padding: 15px; margin-top: 10px; height: 60vh; overflow-y: auto; }
+        .user-card { border: 1px dashed var(--hud-color); padding: 10px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;}
+        
+        #chat-box { height: 300px; border: 1px solid var(--hud-color); padding: 10px; overflow-y: scroll; margin-bottom: 10px; display: flex; flex-direction: column; gap: 5px;}
+        .msg { padding: 5px; background: rgba(0,255,0,0.1); width: fit-content; border-radius: 4px; }
+        .msg.me { align-self: flex-end; background: rgba(0,255,0,0.3); }
     </style>
 </head>
 <body>
@@ -70,23 +48,50 @@
 
         <div id="hub-view" class="hidden">
             <div class="nav-bar">
-                <button class="cyber-btn" onclick="showTab('radio')">Radio Freq</button>
+                <button class="cyber-btn" onclick="showTab('locate')">Locate User</button>
+                <button class="cyber-btn" onclick="showTab('comms')">Comms / GC</button>
+                <button class="cyber-btn" onclick="showTab('radio')">Blind Radio</button>
                 <button class="cyber-btn" onclick="showTab('settings')">Settings</button>
-                <button class="cyber-btn" onclick="logout()" style="border-color: red; color: red;">Disconnect</button>
+                <button class="cyber-btn danger" onclick="logout()">Disconnect</button>
+            </div>
+
+            <div id="locate-tab" class="hidden">
+                <h3>> USER_DATABASE_SEARCH</h3>
+                <input type="text" id="search-input" placeholder="Search by exact username...">
+                <button class="cyber-btn" onclick="searchUsers()">Search</button>
+                <div class="panel" id="search-results"></div>
+            </div>
+
+            <div id="comms-tab" class="hidden">
+                <h3>> SECURE_COMMUNICATIONS</h3>
+                <div style="display: flex; gap: 20px; height: 100%;">
+                    <div style="flex: 1; border: 1px solid var(--hud-color); padding: 10px;" id="friends-list">
+                        <h4>Friends List</h4><hr style="border-color:var(--hud-color); margin: 5px 0;">
+                        </div>
+                    <div style="flex: 2;">
+                        <h4 id="chat-target">Select a friend to chat</h4>
+                        <div id="chat-box"></div>
+                        <div style="display:flex; gap: 5px;">
+                            <input type="text" id="msg-input" placeholder="Type message..." style="width:100%; margin:0;">
+                            <button class="cyber-btn" onclick="sendMessage()">Send</button>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <div id="radio-tab">
-                <h3>> FREQUENCY_COMMUNICATOR</h3>
-                <p>Enter a frequency (e.g., 104.5) to connect via P2P WebRTC.</p><br>
-                <input type="text" id="freq-input" placeholder="000.000">
-                <button class="cyber-btn" onclick="joinFrequency()">Tune In</button>
-                <button class="cyber-btn" id="mic-btn" onclick="toggleMic()">Mute Mic</button>
-                
-                <div id="video-container">
-                    <video id="local-video" autoplay muted playsinline></video>
-                    <video id="remote-video" autoplay playsinline></video>
+                <h3>> ANONYMOUS_FREQUENCY_RADIO</h3>
+                <p>Voice only. No cameras. No identities. Push [SPACEBAR] to talk.</p><br>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <input type="text" id="freq-input" placeholder="Frequency (e.g. 104.5)" style="margin:0;">
+                    <button class="cyber-btn" onclick="joinFrequency()">Tune In</button>
+                    <button class="cyber-btn danger hidden" id="leave-radio-btn" onclick="leaveFrequency()">Power Off Radio</button>
                 </div>
-                <p id="rtc-status" style="margin-top: 10px; color: yellow;">Status: Disconnected</p>
+                
+                <p id="rtc-status" style="margin-top: 15px; color: yellow;">Status: Radio Offline</p>
+                <div id="ptt-indicator" style="margin-top: 10px; color: #555; font-weight: bold;">[MIC MUTED]</div>
+                
+                <audio id="remote-audio" autoplay></audio>
             </div>
 
             <div id="settings-tab" class="hidden">
@@ -122,37 +127,26 @@
         // --- 2. Supabase Init ---
         const SUPABASE_URL = 'https://afddovxxhrpabdcbFmkd.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFmZGRvdnh4aHJwYWJkY2JmbWtkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mzk5NzMsImV4cCI6MjA4OTExNTk3M30.BfViZBwr95NBwq4kx8Sco617bwE8zCnc89Qk-naNdSk';
-        
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
         let currentUser = null;
 
-        // --- 3. CUSTOM AUTH LOGIC (NO EMAILS) ---
+        // --- 3. CUSTOM AUTH ---
         async function register() {
             const user = document.getElementById('username').value.trim();
             const pass = document.getElementById('password').value;
             if(!user || !pass) return document.getElementById('auth-msg').innerText = "ERROR: Missing credentials.";
             
-            document.getElementById('auth-msg').innerText = "PROCESSING...";
-
-            // Role Assignment based on Username
             let userRole = 'User'; 
             if (user === 'Edeer') userRole = 'Grandmaster';
             if (user === 'User1234') userRole = 'Leader';
 
-            // Insert directly into our custom table
-            const { data, error } = await supabaseClient
-                .from('custom_users')
-                .insert([{ username: user, password: pass, role: userRole }]);
+            const { data, error } = await supabaseClient.from('custom_users').insert([{ username: user, password: pass, role: userRole }]);
             
             if (error) {
-                // Error code 23505 means the username already exists (Primary Key violation)
-                if (error.code === '23505') {
-                    document.getElementById('auth-msg').innerText = "ERROR: Username already taken.";
-                } else {
-                    document.getElementById('auth-msg').innerText = `ERROR: ${error.message}`;
-                }
+                if (error.code === '23505') document.getElementById('auth-msg').innerText = "ERROR: Username taken.";
+                else document.getElementById('auth-msg').innerText = `ERROR: ${error.message}`;
             } else {
-                document.getElementById('auth-msg').innerText = `REGISTERED AS [${userRole.toUpperCase()}]. YOU MAY NOW AUTHENTICATE.`;
+                document.getElementById('auth-msg').innerText = `REGISTERED. YOU MAY NOW AUTHENTICATE.`;
             }
         }
 
@@ -161,35 +155,24 @@
             const pass = document.getElementById('password').value;
             if(!user || !pass) return document.getElementById('auth-msg').innerText = "ERROR: Missing credentials.";
 
-            document.getElementById('auth-msg').innerText = "AUTHENTICATING...";
-
-            // Search the custom table for the exact username and password
-            const { data, error } = await supabaseClient
-                .from('custom_users')
-                .select('*')
-                .eq('username', user)
-                .eq('password', pass)
-                .single();
+            const { data, error } = await supabaseClient.from('custom_users').select('*').eq('username', user).eq('password', pass).single();
             
             if (error || !data) {
-                document.getElementById('auth-msg').innerText = `ERROR: Invalid Username or Password.`;
+                document.getElementById('auth-msg').innerText = `ERROR: Invalid Credentials.`;
             } else {
-                currentUser = data; // Save their profile data
+                currentUser = data; 
                 document.documentElement.style.setProperty('--hud-color', currentUser.theme_color);
                 document.getElementById('auth-view').classList.add('hidden');
                 document.getElementById('hub-view').classList.remove('hidden');
+                loadFriends();
             }
         }
 
-        function logout() {
-            currentUser = null;
-            location.reload();
-        }
+        function logout() { location.reload(); }
 
         // --- 4. UI Logic ---
         function showTab(tabId) {
-            document.getElementById('radio-tab').classList.add('hidden');
-            document.getElementById('settings-tab').classList.add('hidden');
+            ['locate', 'comms', 'radio', 'settings'].forEach(t => document.getElementById(`${t}-tab`).classList.add('hidden'));
             document.getElementById(`${tabId}-tab`).classList.remove('hidden');
         }
 
@@ -197,29 +180,122 @@
             const newColor = document.getElementById('color-input').value;
             if(newColor && currentUser) {
                 document.documentElement.style.setProperty('--hud-color', newColor);
-                // Save color to database
                 await supabaseClient.from('custom_users').update({ theme_color: newColor }).eq('username', currentUser.username);
             }
         }
 
-        // --- 5. WEBRTC & RADIO LOGIC ---
-        let localStream;
-        let peerConnection;
-        let signalingChannel;
+        // --- 5. LOCATE & FRIENDS LOGIC ---
+        async function searchUsers() {
+            const query = document.getElementById('search-input').value.trim();
+            if(!query) return;
+            const res = document.getElementById('search-results');
+            res.innerHTML = "Searching DB...";
+            
+            const { data, error } = await supabaseClient.from('custom_users').select('username, role').ilike('username', `%${query}%`);
+            res.innerHTML = '';
+            
+            if(data.length === 0) return res.innerHTML = "No users found.";
+            
+            data.forEach(u => {
+                if(u.username === currentUser.username) return; // Don't show self
+                res.innerHTML += `
+                    <div class="user-card">
+                        <span>[${u.role.toUpperCase()}] ${u.username}</span>
+                        <button class="cyber-btn" onclick="sendFriendReq('${u.username}')">Add Friend</button>
+                    </div>
+                `;
+            });
+        }
+
+        async function sendFriendReq(targetUser) {
+            await supabaseClient.from('friends').insert([{ requester: currentUser.username, addressee: targetUser, status: 'accepted' }]);
+            alert(`Added ${targetUser} to friends network.`);
+            loadFriends();
+        }
+
+        async function loadFriends() {
+            const { data, error } = await supabaseClient.from('friends')
+                .select('*')
+                .or(`requester.eq.${currentUser.username},addressee.eq.${currentUser.username}`);
+            
+            const list = document.getElementById('friends-list');
+            list.innerHTML = '<h4>Friends List</h4><hr style="border-color:var(--hud-color); margin: 5px 0;">';
+            
+            if(data) {
+                data.forEach(f => {
+                    const friendName = f.requester === currentUser.username ? f.addressee : f.requester;
+                    list.innerHTML += `<button class="cyber-btn" style="width:100%; text-align:left; border:none;" onclick="openChat('${friendName}')">> ${friendName}</button>`;
+                });
+            }
+        }
+
+        // --- 6. TEXT MESSAGING ---
+        let activeChat = null;
+        let chatSub = null;
+
+        async function openChat(friendName) {
+            activeChat = friendName;
+            document.getElementById('chat-target').innerText = `Chatting with: ${friendName}`;
+            
+            // Load history
+            const { data } = await supabaseClient.from('messages')
+                .select('*')
+                .or(`and(sender.eq.${currentUser.username},receiver.eq.${friendName}),and(sender.eq.${friendName},receiver.eq.${currentUser.username})`)
+                .order('created_at', { ascending: true });
+            
+            const box = document.getElementById('chat-box');
+            box.innerHTML = '';
+            if(data) data.forEach(m => renderMessage(m));
+
+            // Subscribe to new messages
+            if(chatSub) supabaseClient.removeChannel(chatSub);
+            chatSub = supabaseClient.channel('custom-msg-channel')
+                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => {
+                    const m = payload.new;
+                    if ((m.sender === currentUser.username && m.receiver === friendName) || 
+                        (m.sender === friendName && m.receiver === currentUser.username)) {
+                        renderMessage(m);
+                    }
+                }).subscribe();
+        }
+
+        function renderMessage(m) {
+            const box = document.getElementById('chat-box');
+            const isMe = m.sender === currentUser.username;
+            box.innerHTML += `<div class="msg ${isMe ? 'me' : ''}"><b>${isMe ? 'You' : m.sender}:</b> ${m.content}</div>`;
+            box.scrollTop = box.scrollHeight;
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('msg-input');
+            const msg = input.value.trim();
+            if(!msg || !activeChat) return;
+            input.value = '';
+            await supabaseClient.from('messages').insert([{ sender: currentUser.username, receiver: activeChat, content: msg }]);
+        }
+
+        // --- 7. ANONYMOUS BLIND RADIO & PTT ---
+        let localAudioStream = null;
+        let peerConnection = null;
+        let signalingChannel = null;
         const servers = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
 
         async function joinFrequency() {
             const freq = document.getElementById('freq-input').value;
             if(!freq) return alert("Enter a frequency.");
             
-            document.getElementById('rtc-status').innerText = `Status: Tuning to ${freq}...`;
+            document.getElementById('rtc-status').innerText = `Status: Scanning frequency ${freq}...`;
 
             try {
-                localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-                document.getElementById('local-video').srcObject = localStream;
+                // AUDIO ONLY. No video.
+                localAudioStream = await navigator.mediaDevices.getUserMedia({ video: false, audio: true });
+                
+                // Start Muted for Push-to-Talk
+                localAudioStream.getAudioTracks()[0].enabled = false; 
+
+                document.getElementById('leave-radio-btn').classList.remove('hidden');
             } catch (err) {
-                console.error(err);
-                return alert("Camera/Mic access denied. You must run this via a local server (http://localhost...) or HTTPS.");
+                return alert("Microphone access denied.");
             }
 
             if(signalingChannel) await supabaseClient.removeChannel(signalingChannel);
@@ -227,15 +303,15 @@
 
             signalingChannel.on('broadcast', { event: 'rtc-signal' }, async (payload) => {
                 const message = payload.payload;
-                if (message.sender === currentUser.username) return; 
-
-                if (!peerConnection) createPeerConnection();
+                // Anonymous payload - no username checked, just socket ids or purely blind
+                
+                if (!peerConnection) createPeerConnection(freq);
 
                 if (message.type === 'offer') {
                     await peerConnection.setRemoteDescription(new RTCSessionDescription(message.offer));
                     const answer = await peerConnection.createAnswer();
                     await peerConnection.setLocalDescription(answer);
-                    signalingChannel.send({ type: 'broadcast', event: 'rtc-signal', payload: { type: 'answer', answer: answer, sender: currentUser.username } });
+                    signalingChannel.send({ type: 'broadcast', event: 'rtc-signal', payload: { type: 'answer', answer: answer } });
                 } else if (message.type === 'answer') {
                     await peerConnection.setRemoteDescription(new RTCSessionDescription(message.answer));
                 } else if (message.type === 'ice-candidate') {
@@ -245,39 +321,66 @@
 
             signalingChannel.subscribe(async (status) => {
                 if (status === 'SUBSCRIBED') {
-                    createPeerConnection();
+                    createPeerConnection(freq);
                     const offer = await peerConnection.createOffer();
                     await peerConnection.setLocalDescription(offer);
-                    signalingChannel.send({ type: 'broadcast', event: 'rtc-signal', payload: { type: 'offer', offer: offer, sender: currentUser.username } });
-                    document.getElementById('rtc-status').innerText = `Status: Broadcasting on ${freq}...`;
+                    signalingChannel.send({ type: 'broadcast', event: 'rtc-signal', payload: { type: 'offer', offer: offer } });
+                    document.getElementById('rtc-status').innerText = `Status: Tuned to ${freq} MHz.`;
                 }
             });
         }
 
-        function createPeerConnection() {
+        function createPeerConnection(freq) {
             peerConnection = new RTCPeerConnection(servers);
-            
-            localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+            localAudioStream.getTracks().forEach(track => peerConnection.addTrack(track, localAudioStream));
 
             peerConnection.ontrack = (event) => {
-                document.getElementById('remote-video').srcObject = event.streams[0];
-                document.getElementById('rtc-status').innerText = `Status: Connected to Peer!`;
+                // Play remote audio into the hidden audio tag
+                document.getElementById('remote-audio').srcObject = event.streams[0];
+                document.getElementById('rtc-status').innerText = `Status: Connected to unknown peer on ${freq} MHz`;
             };
 
             peerConnection.onicecandidate = (event) => {
                 if (event.candidate) {
-                    signalingChannel.send({ type: 'broadcast', event: 'rtc-signal', payload: { type: 'ice-candidate', candidate: event.candidate, sender: currentUser.username } });
+                    signalingChannel.send({ type: 'broadcast', event: 'rtc-signal', payload: { type: 'ice-candidate', candidate: event.candidate } });
                 }
             };
         }
 
-        function toggleMic() {
-            if(!localStream) return;
-            const audioTrack = localStream.getAudioTracks()[0];
-            audioTrack.enabled = !audioTrack.enabled;
-            document.getElementById('mic-btn').innerText = audioTrack.enabled ? "Mute Mic" : "Unmute Mic";
-            document.getElementById('mic-btn').style.color = audioTrack.enabled ? "var(--hud-color)" : "red";
+        async function leaveFrequency() {
+            if(signalingChannel) {
+                await supabaseClient.removeChannel(signalingChannel);
+                signalingChannel = null;
+            }
+            if(peerConnection) {
+                peerConnection.close();
+                peerConnection = null;
+            }
+            if(localAudioStream) {
+                localAudioStream.getTracks().forEach(track => track.stop());
+                localAudioStream = null;
+            }
+            document.getElementById('rtc-status').innerText = "Status: Radio Offline.";
+            document.getElementById('leave-radio-btn').classList.add('hidden');
         }
+
+        // PUSH TO TALK LOGIC (Spacebar)
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' && localAudioStream && !document.getElementById('radio-tab').classList.contains('hidden') && e.target.tagName !== 'INPUT') {
+                e.preventDefault(); // Stop page scrolling
+                localAudioStream.getAudioTracks()[0].enabled = true;
+                document.getElementById('ptt-indicator').innerText = "[TRANSMITTING]";
+                document.getElementById('ptt-indicator').style.color = "var(--hud-color)";
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            if (e.code === 'Space' && localAudioStream) {
+                localAudioStream.getAudioTracks()[0].enabled = false;
+                document.getElementById('ptt-indicator').innerText = "[MIC MUTED]";
+                document.getElementById('ptt-indicator').style.color = "#555";
+            }
+        });
     </script>
 </body>
 </html>
