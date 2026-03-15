@@ -59,7 +59,7 @@
         
         <div id="auth-view">
             <h2>> SYSTEM_LOGIN</h2><br>
-            <input type="text" id="username" placeholder="USERNAME">
+            <input type="text" id="username" placeholder="USERNAME" autocomplete="off">
             <input type="password" id="password" placeholder="PASSWORD">
             <div style="display:flex;">
                 <button class="cyber-btn" onclick="login()">Authenticate</button>
@@ -123,55 +123,66 @@
         const SUPABASE_URL = 'https://afddovxxhrpabdcbFmkd.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFmZGRvdnh4aHJwYWJkY2JmbWtkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1Mzk5NzMsImV4cCI6MjA4OTExNTk3M30.BfViZBwr95NBwq4kx8Sco617bwE8zCnc89Qk-naNdSk';
         
-        // FIXED: Using supabaseClient to avoid colliding with the CDN's global object
         const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
         let currentUser = null;
 
-        // --- 3. Auth Logic ---
+        // --- 3. CUSTOM AUTH LOGIC (NO EMAILS) ---
         async function register() {
-            const user = document.getElementById('username').value;
+            const user = document.getElementById('username').value.trim();
             const pass = document.getElementById('password').value;
             if(!user || !pass) return document.getElementById('auth-msg').innerText = "ERROR: Missing credentials.";
             
             document.getElementById('auth-msg').innerText = "PROCESSING...";
 
-            const { data, error } = await supabaseClient.auth.signUp({
-                email: `${user}@matrix.local`, 
-                password: pass, 
-                options: { data: { username: user } }
-            });
+            // Role Assignment based on Username
+            let userRole = 'User'; 
+            if (user === 'Edeer') userRole = 'Grandmaster';
+            if (user === 'User1234') userRole = 'Leader';
+
+            // Insert directly into our custom table
+            const { data, error } = await supabaseClient
+                .from('custom_users')
+                .insert([{ username: user, password: pass, role: userRole }]);
             
             if (error) {
-                document.getElementById('auth-msg').innerText = `ERROR: ${error.message}`;
+                // Error code 23505 means the username already exists (Primary Key violation)
+                if (error.code === '23505') {
+                    document.getElementById('auth-msg').innerText = "ERROR: Username already taken.";
+                } else {
+                    document.getElementById('auth-msg').innerText = `ERROR: ${error.message}`;
+                }
             } else {
-                document.getElementById('auth-msg').innerText = "REGISTERED. YOU MAY NOW AUTHENTICATE.";
+                document.getElementById('auth-msg').innerText = `REGISTERED AS [${userRole.toUpperCase()}]. YOU MAY NOW AUTHENTICATE.`;
             }
         }
 
         async function login() {
-            const user = document.getElementById('username').value;
+            const user = document.getElementById('username').value.trim();
             const pass = document.getElementById('password').value;
             if(!user || !pass) return document.getElementById('auth-msg').innerText = "ERROR: Missing credentials.";
 
             document.getElementById('auth-msg').innerText = "AUTHENTICATING...";
 
-            const { data, error } = await supabaseClient.auth.signInWithPassword({
-                email: `${user}@matrix.local`, 
-                password: pass
-            });
+            // Search the custom table for the exact username and password
+            const { data, error } = await supabaseClient
+                .from('custom_users')
+                .select('*')
+                .eq('username', user)
+                .eq('password', pass)
+                .single();
             
-            if (error) {
-                document.getElementById('auth-msg').innerText = `ERROR: ${error.message}`;
+            if (error || !data) {
+                document.getElementById('auth-msg').innerText = `ERROR: Invalid Username or Password.`;
             } else {
-                currentUser = data.user;
+                currentUser = data; // Save their profile data
+                document.documentElement.style.setProperty('--hud-color', currentUser.theme_color);
                 document.getElementById('auth-view').classList.add('hidden');
                 document.getElementById('hub-view').classList.remove('hidden');
             }
         }
 
-        async function logout() {
-            await supabaseClient.auth.signOut();
+        function logout() {
+            currentUser = null;
             location.reload();
         }
 
@@ -182,10 +193,12 @@
             document.getElementById(`${tabId}-tab`).classList.remove('hidden');
         }
 
-        function updateColor() {
+        async function updateColor() {
             const newColor = document.getElementById('color-input').value;
-            if(newColor) {
+            if(newColor && currentUser) {
                 document.documentElement.style.setProperty('--hud-color', newColor);
+                // Save color to database
+                await supabaseClient.from('custom_users').update({ theme_color: newColor }).eq('username', currentUser.username);
             }
         }
 
@@ -201,7 +214,6 @@
             
             document.getElementById('rtc-status').innerText = `Status: Tuning to ${freq}...`;
 
-            // 1. Get Camera/Mic
             try {
                 localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
                 document.getElementById('local-video').srcObject = localStream;
@@ -210,14 +222,12 @@
                 return alert("Camera/Mic access denied. You must run this via a local server (http://localhost...) or HTTPS.");
             }
 
-            // 2. Setup Supabase Realtime Channel for Signaling
             if(signalingChannel) await supabaseClient.removeChannel(signalingChannel);
             signalingChannel = supabaseClient.channel(`radio-${freq}`, { config: { broadcast: { ack: false } } });
 
-            // Listen for incoming WebRTC signals
             signalingChannel.on('broadcast', { event: 'rtc-signal' }, async (payload) => {
                 const message = payload.payload;
-                if (message.sender === currentUser.id) return; // Ignore our own signals
+                if (message.sender === currentUser.username) return; 
 
                 if (!peerConnection) createPeerConnection();
 
@@ -225,7 +235,7 @@
                     await peerConnection.setRemoteDescription(new RTCSessionDescription(message.offer));
                     const answer = await peerConnection.createAnswer();
                     await peerConnection.setLocalDescription(answer);
-                    signalingChannel.send({ type: 'broadcast', event: 'rtc-signal', payload: { type: 'answer', answer: answer, sender: currentUser.id } });
+                    signalingChannel.send({ type: 'broadcast', event: 'rtc-signal', payload: { type: 'answer', answer: answer, sender: currentUser.username } });
                 } else if (message.type === 'answer') {
                     await peerConnection.setRemoteDescription(new RTCSessionDescription(message.answer));
                 } else if (message.type === 'ice-candidate') {
@@ -233,13 +243,12 @@
                 }
             });
 
-            // Join channel and create an offer to anyone listening
             signalingChannel.subscribe(async (status) => {
                 if (status === 'SUBSCRIBED') {
                     createPeerConnection();
                     const offer = await peerConnection.createOffer();
                     await peerConnection.setLocalDescription(offer);
-                    signalingChannel.send({ type: 'broadcast', event: 'rtc-signal', payload: { type: 'offer', offer: offer, sender: currentUser.id } });
+                    signalingChannel.send({ type: 'broadcast', event: 'rtc-signal', payload: { type: 'offer', offer: offer, sender: currentUser.username } });
                     document.getElementById('rtc-status').innerText = `Status: Broadcasting on ${freq}...`;
                 }
             });
@@ -248,19 +257,16 @@
         function createPeerConnection() {
             peerConnection = new RTCPeerConnection(servers);
             
-            // Add local tracks to connection
             localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
 
-            // Listen for remote tracks
             peerConnection.ontrack = (event) => {
                 document.getElementById('remote-video').srcObject = event.streams[0];
                 document.getElementById('rtc-status').innerText = `Status: Connected to Peer!`;
             };
 
-            // Send ICE candidates to peer
             peerConnection.onicecandidate = (event) => {
                 if (event.candidate) {
-                    signalingChannel.send({ type: 'broadcast', event: 'rtc-signal', payload: { type: 'ice-candidate', candidate: event.candidate, sender: currentUser.id } });
+                    signalingChannel.send({ type: 'broadcast', event: 'rtc-signal', payload: { type: 'ice-candidate', candidate: event.candidate, sender: currentUser.username } });
                 }
             };
         }
